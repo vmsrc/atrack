@@ -126,8 +126,8 @@
 		var oldestT=1500000000;
 		if (edMaxHours.value>0)
 			oldestT=lastT-edMaxHours.value*3600;
-		const mergeRadius=edMergeRadius.value;
-		var breakRadius=edBreakRadius.value;
+		const mergeRadius=edMergeRadius.value*1;
+		var breakRadius=edBreakRadius.value*1;
 		if (breakRadius>0)
 			breakRadius+=2*mergeRadius;
 		var lastMergedIx=-1;
@@ -167,6 +167,9 @@
 		}
 		if (res.length<1)
 			res.push(pts[pts.length-1]);
+		for (var i=0; i<res.length; i++) {
+			console.log("i="+i+":"+res[i].brk);
+		}
 		return res;
 	}
 

@@ -157,6 +157,7 @@ static int parseMmtReqPoints(struct envCGI *env, char *wbuf)
 					if (fd>=0)
 						write(fd, pos, PACK_POS_SIZE);
 				}
+				tknIdx=0;
 			}
 			start=idx+1;
 		}
