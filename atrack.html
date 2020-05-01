@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Activity tracker</title>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="shortcut icon" type="image/x-icon" href="favicon.ico" />
+	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin=""/>
+	<script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+</head>
+<body>
+
+<table style="position: absolute; top: 0; bottom: 0; left: 0; right: 0; width: 100%; height: 100%; border-spacing: 5px;">
+	<tr>
+		<td height="100%" width="75%" rowspan="0" bgcolor="#404040">
+			<div id="idMapDiv" style="width:100%; height: 100%;"></div>
+		</td>
+		<td></td>
+		<td></td>
+	</tr>
+	<tr>
+		<td>Activity name</td>
+		<td><input id="idActivity" type="text" value="MyActivity" size="8"></td>
+	</tr>
+	<tr>
+		<td>Merge radius, m</td>
+		<td><input id="idMergeRadius" type="number" value="10" style="width: 5em;"></td>
+	</tr>
+	<tr>
+		<td>Break track radius, m</td>
+		<td><input id="idBreakRadius" type="number" value="2000" style="width: 5em;"></td>
+	</tr>
+	<tr>
+		<td>Max duration, hours</td>
+		<td><input id="idMaxHours" type="number" value="0" style="width: 5em;"></td>
+	</tr>
+	<tr>
+		<td><button id="idBtnStart" onclick="onBtnStart()">Start</button></td>
+		<td><button id="idBtnFit" onclick="onBtnFit()">Fit Track</button></td>
+	</tr>
+	<tr>
+		<td colspan="2"><input id="idStatus" type="text" readonly="1" style="width:90%;"></input></td>
+	</tr>
+	<tr>
+		<td><button id="idBtnGpx" onclick="onBtnGpx()">Export GPX</button></td>
+		<td><div id="idGpxDiv"></div></td>
+	</tr>
+	<tr height="100%"></tr>
+</table>
+<script>
+	const mapDiv=document.getElementById("idMapDiv");
+	const edActivity=document.getElementById("idActivity");
+	const edMergeRadius=document.getElementById("idMergeRadius");
+	const edBreakRadius=document.getElementById("idBreakRadius");
+	const edMaxHours=document.getElementById("idMaxHours");
+	const btnStart=document.getElementById("idBtnStart");
+	const btnFit=document.getElementById("idBtnFit");
+	btnFit.disabled=true;
+	const edStatus=document.getElementById("idStatus");
+	const btnGpx=document.getElementById("idBtnGpx");
+	btnGpx.disabled=true;
+	const gpxDiv=document.getElementById("idGpxDiv");
+
+	edStatus.value="Press START to receie activity\n";
+
+	var mymap=null;
+	var mapGroup=null;
+	function createMap()
+	{
+		mymap=L.map(mapDiv).setView([0.0, 0.0], 1);
+
+		L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+			maxZoom: 18,
+			attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
+				'<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+				'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+			id: 'mapbox/streets-v11',
+			tileSize: 512,
+			zoomOffset: -1
+		}).addTo(mymap);
+	}
+
+	// Stupid and inaccurate distance calculation.
+	function latLngDist(pt1, pt2)
+	{
+		const R=6371009.0;
+		const lat1=Math.PI/180*pt1[0];
+		const lng1=Math.PI/180*pt1[1];
+		const lat2=Math.PI/180*pt2[0];
+		const lng2=Math.PI/180*pt2[1];
+		const r1=Math.cos(lat1)*R;
+		const r2=Math.cos(lat2)*R;
+		const x1=Math.sin(lng1)*r1;
+		const y1=Math.cos(lng1)*r1;
+		const x2=Math.sin(lng2)*r2;
+		const y2=Math.cos(lng2)*r2;
+		const z1=Math.sin(lat1)*R;
+		const z2=Math.sin(lat2)*R;
+		const dx=x1-x2;
+		const dy=y1-y2;
+		const dz=z1-z2;
+		return Math.sqrt(dx*dx+dy*dy+dz*dz);
+	}
+
+	function parseResponse(resp)
+	{
+		var res=[];
+		var dataview=new DataView(resp);
+		for (var offs=0; offs<resp.byteLength-11; offs+=12) {
+			var pt={pos:[0, 0], t:0};
+			pt.pos[0]=dataview.getUint32(offs, true)*(180.0/0xffffffff)-90.0;
+			pt.pos[1]=dataview.getUint32(offs+4, true)*(360.0/0xffffffff)-180.0;
+			pt.t=dataview.getUint32(offs+8, true);
+			res.push(pt);
+			t=pt.t;
+		}
+		return res;
+	}
+
+	function filterRespnse(pts)
+	{
+		var res=[];
+		if (pts.length<1)
+			return res;
+		const lastT=pts[pts.length-1].t;
+		var oldestT=1500000000;
+		if (edMaxHours.value>0)
+			oldestT=lastT-edMaxHours.value*3600;
+		const mergeRadius=edMergeRadius.value;
+		var breakRadius=edBreakRadius.value;
+		if (breakRadius>0)
+			breakRadius+=2*mergeRadius;
+		var lastMergedIx=-1;
+		for (var i=0; i<pts.length; i++) {
+			if (pts[i].t<oldestT)
+				continue;
+			if (res.length && (mergeRadius>0 || breakRadius>0)) {
+				var lastRes=res[res.length-1];
+				var dist=latLngDist(pts[i].pos, lastRes.pos);
+				if (dist<mergeRadius) {
+					lastMergedIx=i;
+					continue;
+				}
+				if (lastMergedIx>=0) {
+					var pt=pts[lastMergedIx];
+					pt.brk=false;
+					res.push(pt);
+					dist=latLngDist(pts[i].pos, pt.pos);
+					if (dist<mergeRadius) {
+						lastMergedIx=i;
+						continue;
+					}
+					lastMergedIx=-1;
+				}
+				if (breakRadius>0 && dist>breakRadius) {
+					res[res.length-1].brk=true;
+				}
+			}
+			var pt=pts[i];
+			pt.brk=false;
+			res.push(pt);
+		}
+		if (lastMergedIx>=0) {
+			var pt=pts[lastMergedIx];
+			pt.brk=false;
+			res.push(pt);
+		}
+		if (res.length<1)
+			res.push(pts[pts.length-1]);
+		return res;
+	}
+
+	function calcSpeed(ptIx)
+	{
+		var speed=-1;
+		const pt1=mapPoints[ptIx];
+		var pt2=null;
+		if (ptIx>0) {
+			pt2=mapPoints[ptIx-1];
+			if (pt2.brk)
+				pt2=null;
+		}
+		if (!pt2 && !pt1.brk && ptIx<mapPoints.length-1) {
+			pt2=mapPoints[ptIx+1];
+		}
+		if (pt2) {
+			var dist=latLngDist(pt1.pos, pt2.pos);
+			var dt=Math.abs(pt1.t - pt2.t);
+			speed=dist/dt*(3600.0/1000.0);
+		}
+		return speed;
+	}
+
+	function popupString(ptIx)
+	{
+		const pt=mapPoints[ptIx];
+		var d=new Date(0);
+		d.setUTCSeconds(pt.t);
+		var str=d.toLocaleString();
+		str+="<br>position: " + pt.pos[0].toFixed(6)+", " + pt.pos[1].toFixed(6);
+		const speed=calcSpeed(ptIx);
+		if (speed>=0)
+			str+="<br>speed: " + Math.round(speed) + " kph";
+		return str;
+	}
+
+	function startStopMarker(ptIx, start)
+	{
+		const pt=mapPoints[ptIx];
+		var str=start ? "Begin<br>" : "End<br>";
+		str+=popupString(ptIx);
+		L.marker(pt.pos).addTo(mapGroup)
+		.bindPopup(str).openPopup();
+	}
+
+	var popup=L.popup();
+	var mapPoints=[];
+	function onPolyLineClick(e)
+	{
+		glob=e.latlng;
+		if (mapPoints.length<1 || !mapGroup)
+			return;
+		const clickPos=[e.latlng.lat, e.latlng.lng];
+		var ptIx=-1;
+		var minDist=1.0e10;
+		for (var i=0; i<mapPoints.length; i++) {
+			const dist=latLngDist(clickPos, mapPoints[i].pos);
+			if (dist<minDist) {
+				minDist=dist;
+				ptIx=i;
+			}
+		}
+		if (ptIx<0)
+			return;
+		const pt=mapPoints[ptIx];
+		var str=popupString(ptIx);
+		popup.setLatLng(pt.pos);
+		popup.setContent(str);
+		popup.openOn(mymap);
+	}
+
+	var maxZoomOnUpdate=true;
+	function updateMap()
+	{
+		if (!mapGroup)
+			mapGroup=L.featureGroup().addTo(mymap);
+		mapGroup.clearLayers();
+		mymap.removeLayer(popup);
+		if (mapPoints.length<1)
+			return;
+		const pts=mapPoints;
+		var poly=[];
+		var startIx=-1;
+		for (var i=0; i<pts.length; i++) {
+			poly.push(pts[i].pos);
+			if (startIx<0)
+				startIx=i;
+			if (pts[i].brk || i==pts.length-1) {
+				if (poly.length>1) {
+					if (startIx>=0)
+						startStopMarker(startIx, true);
+					var polyLine=L.polyline(poly);
+					polyLine.addTo(mapGroup);
+					polyLine.on('click', onPolyLineClick);
+
+				}
+				startStopMarker(i, false);
+				poly=[];
+				startIx=-1;
+			}
+		}
+		const lastPos=mapPoints[mapPoints.length-1].pos;
+		if (maxZoomOnUpdate) {
+			mymap.setView(lastPos, 1000);
+			maxZoomOnUpdate=false;
+		} else {
+			mymap.setView(lastPos);
+		}
+	}
+
+	var mapPointsActivity=null;
+	function onReadyStateChange(httpReq)
+	{
+		// In local files, status is 0 upon success in Mozilla Firefox
+		if (!(httpReq.readyState===XMLHttpRequest.DONE))
+			return;
+		btnStart.disabled=false;
+		const status=httpReq.status;
+		if (status==200) {
+			// The request has been completed successfully
+			var resp=httpReq.response;
+			var pts=parseResponse(resp);
+			mapPoints=filterRespnse(pts);
+			edStatus.value="GPS data reveived, "+mapPoints.length+"/"+pts.length+" pts used.";
+			updateMap();
+			mapPointsActivity=edActivity.value;
+		} else {
+			edStatus.value="GPS data error: "+status;
+		}
+		btnGpx.disabled=(mapPoints.length<1);
+		btnFit.disabled=(mapPoints.length<1);
+	}
+
+	function clearGpxDiv()
+	{
+		while (gpxDiv.children.length)
+			gpxDiv.removeChild(gpxDiv.children[0]);
+	}
+
+	function onBtnStart()
+	{
+		clearGpxDiv();
+		if (mymap==null)
+			createMap();
+		btnStart.disabled=true;
+		const httpReq=new XMLHttpRequest();
+		var url=window.location.pathname;
+		var lastDot=url.lastIndexOf(".");
+		if (lastDot>0)
+			url=url.substr(0, lastDot);
+		url+="_data/"+edActivity.value+".gpsbin"+"?"+(new Date()).getTime();
+		httpReq.open("GET", url);
+		httpReq.responseType="arraybuffer";
+		httpReq.send();
+		edStatus.value="Requesting GPS data...\n";
+
+		httpReq.onreadystatechange=function()
+		{
+			onReadyStateChange(httpReq);
+		}
+
+	}
+
+	function onBtnFit()
+	{
+		var bounds=mapGroup.getBounds();
+		if (bounds.isValid()) {
+			mymap.fitBounds(bounds);
+		} else if (mapPoints.length>0) {
+			mymap.setView(mapPoints[mapPoints.length-1].pos, 1000)
+		}
+	}
+
+	function genGpx()
+	{
+		var res='<gpx xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1" creator="OruxMaps v.7.4.22" version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">\n';
+		res+=" <trk>\n";
+		var newSeg=true;
+		for (var i=0; i<mapPoints.length; i++) {
+			if (newSeg)
+				res+="  <trkseg>\n";
+			var pt=mapPoints[i];
+			var date=new Date(0);
+			date.setUTCSeconds(pt.t);
+			res+='   <trkpt lat="'+pt.pos[0].toFixed(8)+'" lon="'+pt.pos[1].toFixed(8)+'">\n';
+			res+='    <time>'+date.toISOString()+'</time>\n';
+			res+='   </trkpt>\n';
+			newSeg=pt.brk;
+			if (newSeg)
+				res+="  </trkseg>\n";
+		}
+		if (!newSeg)
+			res+="  </trkseg>\n";
+		res+=" </trk>\n";
+		res+="</gpx>\n";
+		return res;
+	}
+
+	function onBtnGpx()
+	{
+		clearGpxDiv();
+		if (mapPoints.length<1) {
+			edStatus.value="No GPS data to export.";
+			return;
+		}
+		const gpx=genGpx();
+
+		const url=URL.createObjectURL(new Blob([gpx], {type: "text/plain"}));
+
+		const fileName=mapPointsActivity+".gpx";
+		const lnk=document.createElement('a');
+		lnk.download=fileName;
+		lnk.href=url;
+		lnk.innerText=fileName;
+		
+		gpxDiv.appendChild(lnk);
+		edStatus.value="GPX export ready.";
+	}
+</script>
+
+</body>
+</html>
