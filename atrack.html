@@ -20,7 +20,7 @@
 	</tr>
 	<tr>
 		<td>Activity name</td>
-		<td><input id="idActivity" type="text" value="MyActivity" size="8"></td>
+		<td><input id="idActivity" type="text" value="MyActivity" onkeyup="onActivityKeyUp(event)" size="8"></td>
 	</tr>
 	<tr>
 		<td>Merge radius, m</td>
@@ -60,6 +60,17 @@
 	const btnGpx=document.getElementById("idBtnGpx");
 	btnGpx.disabled=true;
 	const gpxDiv=document.getElementById("idGpxDiv");
+
+
+	var wndUrl=new URL(window.location.href);
+	var autoStart=false;
+	{
+		var activity=wndUrl.searchParams.get("activity");
+		if (activity && activity.length>0) {
+			edActivity.value=activity;
+			autoStart=true;
+		}
+	}
 
 	edStatus.value="Press START to receie activity\n";
 
@@ -117,7 +128,7 @@
 		return res;
 	}
 
-	function filterRespnse(pts)
+	function filterResponse(pts)
 	{
 		var res=[];
 		if (pts.length<1)
@@ -290,10 +301,15 @@
 			// The request has been completed successfully
 			var resp=httpReq.response;
 			var pts=parseResponse(resp);
-			mapPoints=filterRespnse(pts);
+			mapPoints=filterResponse(pts);
 			edStatus.value="GPS data reveived, "+mapPoints.length+"/"+pts.length+" pts used.";
 			updateMap();
 			mapPointsActivity=edActivity.value;
+			if (!autoStart && window.history.pushState) {
+				wndUrl.searchParams.set("activity", edActivity.value);
+				window.history.pushState("uselessstring1", "uselessstring2", wndUrl);
+			}
+			autoStart=false;
 		} else {
 			edStatus.value="GPS data error: "+status;
 		}
@@ -307,7 +323,7 @@
 			gpxDiv.removeChild(gpxDiv.children[0]);
 	}
 
-	function onBtnStart()
+	function start()
 	{
 		clearGpxDiv();
 		if (mymap==null)
@@ -328,7 +344,17 @@
 		{
 			onReadyStateChange(httpReq);
 		}
+	}
 
+	function onActivityKeyUp(event)
+	{
+		if (event.keyCode==13)
+			start();
+	}
+
+	function onBtnStart()
+	{
+		start();
 	}
 
 	function onBtnFit()
@@ -382,10 +408,15 @@
 		lnk.download=fileName;
 		lnk.href=url;
 		lnk.innerText=fileName;
-		
+		lnk.onclick=function(e) {
+			clearGpxDiv();
+		};		
 		gpxDiv.appendChild(lnk);
 		edStatus.value="GPX export ready.";
 	}
+
+	if (autoStart)
+		start();
 </script>
 
 </body>
