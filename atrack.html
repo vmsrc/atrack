@@ -23,16 +23,8 @@
 		<td><input id="idActivity" type="text" value="MyActivity" onkeyup="onActivityKeyUp(event)" size="8"></td>
 	</tr>
 	<tr>
-		<td>Merge radius, m</td>
-		<td><input id="idMergeRadius" type="number" value="10" style="width: 5em;"></td>
-	</tr>
-	<tr>
-		<td>Break track radius, m</td>
-		<td><input id="idBreakRadius" type="number" value="2000" style="width: 5em;"></td>
-	</tr>
-	<tr>
 		<td>Max duration, hours</td>
-		<td><input id="idMaxHours" type="number" value="0" style="width: 5em;"></td>
+		<td><input id="idMaxHours" type="number" value="24" style="width: 5em;"></td>
 	</tr>
 	<tr>
 		<td><button id="idBtnStart" onclick="onBtnStart()">Start</button></td>
@@ -50,8 +42,6 @@
 <script>
 	const mapDiv=document.getElementById("idMapDiv");
 	const edActivity=document.getElementById("idActivity");
-	const edMergeRadius=document.getElementById("idMergeRadius");
-	const edBreakRadius=document.getElementById("idBreakRadius");
 	const edMaxHours=document.getElementById("idMaxHours");
 	const btnStart=document.getElementById("idBtnStart");
 	const btnFit=document.getElementById("idBtnFit");
@@ -61,15 +51,25 @@
 	btnGpx.disabled=true;
 	const gpxDiv=document.getElementById("idGpxDiv");
 
-
+	var mergeRadius=0;
+	var breakRadius=1000;
 	var wndUrl=new URL(window.location.href);
 	var autoStart=false;
 	{
-		var activity=wndUrl.searchParams.get("activity");
-		if (activity && activity.length>0) {
-			edActivity.value=activity;
+		var tmp=wndUrl.searchParams.get("activity");
+		if (tmp && tmp.length>0) {
+			edActivity.value=tmp;
 			autoStart=true;
 		}
+		tmp=wndUrl.searchParams.get("maxHours");
+		if (tmp && tmp.length>0)
+			edMaxHours.value=tmp;
+		tmp=wndUrl.searchParams.get("mergeRadius");
+		if (tmp && tmp.length>0)
+			mergeRadius=tmp*1;
+		tmp=wndUrl.searchParams.get("breakRadius");
+		if (tmp && tmp.length>0)
+			breakRadius=tmp*1;
 	}
 
 	edStatus.value="Press START to receie activity\n";
@@ -137,10 +137,6 @@
 		var oldestT=1500000000;
 		if (edMaxHours.value>0)
 			oldestT=lastT-edMaxHours.value*3600;
-		const mergeRadius=edMergeRadius.value*1;
-		var breakRadius=edBreakRadius.value*1;
-		if (breakRadius>0)
-			breakRadius+=2*mergeRadius;
 		var lastMergedIx=-1;
 		for (var i=0; i<pts.length; i++) {
 			if (pts[i].t<oldestT)
@@ -307,6 +303,11 @@
 			mapPointsActivity=edActivity.value;
 			if (!autoStart && window.history.pushState) {
 				wndUrl.searchParams.set("activity", edActivity.value);
+				if (edMaxHours.value=="24") {
+					wndUrl.searchParams.delete("maxHours");
+				} else {
+					wndUrl.searchParams.set("maxHours", edMaxHours.value);
+				}
 				window.history.pushState("uselessstring1", "uselessstring2", wndUrl);
 			}
 			autoStart=false;
