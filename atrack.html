@@ -216,8 +216,7 @@
 		const pt=mapPoints[ptIx];
 		var str=start ? "Begin<br>" : "End<br>";
 		str+=popupString(ptIx);
-		L.marker(pt.pos).addTo(mapGroup)
-		.bindPopup(str).openPopup();
+		return L.marker(pt.pos).addTo(mapGroup).bindPopup(str);
 	}
 
 	var popup=L.popup();
@@ -258,6 +257,7 @@
 		const pts=mapPoints;
 		var poly=[];
 		var startIx=-1;
+		var lastMarker=null;
 		for (var i=0; i<pts.length; i++) {
 			poly.push(pts[i].pos);
 			if (startIx<0)
@@ -271,11 +271,14 @@
 					polyLine.on('click', onPolyLineClick);
 
 				}
-				startStopMarker(i, false);
+				lastMarker=startStopMarker(i, false);
 				poly=[];
 				startIx=-1;
 			}
 		}
+		if (lastMarker)
+			lastMarker.openPopup();
+
 		const lastPos=mapPoints[mapPoints.length-1].pos;
 		if (maxZoomOnUpdate) {
 			mymap.setView(lastPos, 1000);
