@@ -1,4 +1,4 @@
-# GPS Activity Tracker
+# OruxMaps/MapMyTracks based GPS Activity Tracker
 
 Self-hosted online location sharing.  
  - [OruxMaps](https://www.oruxmaps.com/cs/en/) compatible.
