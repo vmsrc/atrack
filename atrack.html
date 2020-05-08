@@ -201,8 +201,13 @@
 	function popupString(ptIx)
 	{
 		const pt=mapPoints[ptIx];
+		var t=pt.t;
+		if (t<1500000000) {
+			// Too old stamp: workaround GPS week number rollover of 1024 weeks.
+			t+=1024*7*24*3600;
+		}
 		var d=new Date(0);
-		d.setUTCSeconds(pt.t);
+		d.setUTCSeconds(t);
 		var str=d.toLocaleString();
 		str+="<br>position: " + pt.pos[0].toFixed(6)+", " + pt.pos[1].toFixed(6);
 		const speed=calcSpeed(ptIx);
