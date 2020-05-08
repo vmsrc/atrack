@@ -134,7 +134,7 @@
 		if (pts.length<1)
 			return res;
 		const lastT=pts[pts.length-1].t;
-		var oldestT=1500000000;
+		var oldestT=0;
 		if (edMaxHours.value>0)
 			oldestT=lastT-edMaxHours.value*3600;
 		var lastMergedIx=-1;

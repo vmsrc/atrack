@@ -134,7 +134,7 @@ static int hexdigit(char d)
 
 static int parseMmtReqPoints(struct envCGI *env, char *wbuf)
 {
-	DPRINTF("parseMmtReqPoints: req=%s\n", wbuf);
+	DPRINTF("parseMmtReqPoints: %s\n", wbuf);
 
 	char fileName[MAX_PATH_LEN+1];
 	makeGpsBinName(env, fileName);
@@ -211,7 +211,7 @@ static const char *parseMmtReq(struct envCGI *env, char *wbuf)
 				reqType=val;
 			} else if (!strcmp(var, "points")) {
 				int res=parseMmtReqPoints(env, val);
-				DPRINTF("parseMmtReqPoints: res=%d\n", res);
+				DPRINTF("parseMmtReqPoints: %d\n", res);
 				if (res)
 					return NULL;
 			}
