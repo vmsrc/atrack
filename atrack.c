@@ -59,7 +59,7 @@ static void getCGIEnv(struct envCGI *env)
 #define PACK_POS_SIZE 12
 static int packPos(const char *latStr, const char *lonStr, u64 t, u8 packed[PACK_POS_SIZE])
 {
-	if (t<1000000000)
+	if (t<1)
 		return -1;
 	char *endptr=NULL;
 
@@ -134,7 +134,7 @@ static int hexdigit(char d)
 
 static int parseMmtReqPoints(struct envCGI *env, char *wbuf)
 {
-	DPRINTF("parseMmtReqPoints: %s\n", wbuf);
+	DPRINTF("parseMmtReqPoints: req=%s\n", wbuf);
 
 	char fileName[MAX_PATH_LEN+1];
 	makeGpsBinName(env, fileName);
@@ -211,7 +211,7 @@ static const char *parseMmtReq(struct envCGI *env, char *wbuf)
 				reqType=val;
 			} else if (!strcmp(var, "points")) {
 				int res=parseMmtReqPoints(env, val);
-				DPRINTF("parseMmtReqPoints: %d\n", res);
+				DPRINTF("parseMmtReqPoints: res=%d\n", res);
 				if (res)
 					return NULL;
 			}
