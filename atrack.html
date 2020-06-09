@@ -24,7 +24,7 @@
 	</tr>
 	<tr>
 		<td>Max duration, hours</td>
-		<td><input id="idMaxHours" type="number" value="24" style="width: 5em;"></td>
+		<td><input id="idMaxHours" type="number" value="15" style="width: 5em;"></td>
 	</tr>
 	<tr>
 		<td><button id="idBtnStart" onclick="onBtnStart()">Start</button></td>
@@ -333,7 +333,7 @@
 			mapPointsActivity=edActivity.value;
 			if (!autoStart && window.history.pushState) {
 				wndUrl.searchParams.set("activity", edActivity.value);
-				if (edMaxHours.value=="24") {
+				if (parseInt(edMaxHours.value)==15) {
 					wndUrl.searchParams.delete("maxHours");
 				} else {
 					wndUrl.searchParams.set("maxHours", edMaxHours.value);
