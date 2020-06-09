@@ -34,7 +34,6 @@
 		<td colspan="2"><input id="idStatus" type="text" readonly="1" style="width:90%;"></input></td>
 	</tr>
 	<tr>
-		<td><button id="idBtnGpx" onclick="onBtnGpx()">Export GPX</button></td>
 		<td><div id="idGpxDiv"></div></td>
 	</tr>
 	<tr height="100%"></tr>
@@ -47,8 +46,6 @@
 	const btnFit=document.getElementById("idBtnFit");
 	btnFit.disabled=true;
 	const edStatus=document.getElementById("idStatus");
-	const btnGpx=document.getElementById("idBtnGpx");
-	btnGpx.disabled=true;
 	const gpxDiv=document.getElementById("idGpxDiv");
 
 	var mergeRadius=0;
@@ -293,6 +290,31 @@
 		}
 	}
 
+	function onGpxExport()
+	{
+		const gpx=genGpx();
+		const url=URL.createObjectURL(new Blob([gpx], {type: "text/plain"}));
+		const fileName=mapPointsActivity+".gpx";
+		const lnk=document.createElement('a');
+		lnk.download=fileName;
+		lnk.href=url;
+		lnk.click();
+	}
+
+	function createGpxAnchor()
+	{
+		const lnk=document.createElement('a');
+		lnk.href="javascript:onGpxExport()";
+		lnk.text="Export GPX";
+		gpxDiv.appendChild(lnk);
+	}
+
+	function clearGpxDiv()
+	{
+		while (gpxDiv.children.length)
+			gpxDiv.removeChild(gpxDiv.children[0]);
+	}
+
 	var mapPointsActivity=null;
 	function onReadyStateChange(httpReq)
 	{
@@ -322,19 +344,14 @@
 		} else {
 			edStatus.value="GPS data error: "+status;
 		}
-		btnGpx.disabled=(mapPoints.length<1);
 		btnFit.disabled=(mapPoints.length<1);
-	}
-
-	function clearGpxDiv()
-	{
-		while (gpxDiv.children.length)
-			gpxDiv.removeChild(gpxDiv.children[0]);
+		clearGpxDiv();
+		if (mapPoints.length>0)
+			createGpxAnchor();
 	}
 
 	function start()
 	{
-		clearGpxDiv();
 		if (mymap==null)
 			createMap();
 		btnStart.disabled=true;
@@ -399,29 +416,6 @@
 		res+=" </trk>\n";
 		res+="</gpx>\n";
 		return res;
-	}
-
-	function onBtnGpx()
-	{
-		clearGpxDiv();
-		if (mapPoints.length<1) {
-			edStatus.value="No GPS data to export.";
-			return;
-		}
-		const gpx=genGpx();
-
-		const url=URL.createObjectURL(new Blob([gpx], {type: "text/plain"}));
-
-		const fileName=mapPointsActivity+".gpx";
-		const lnk=document.createElement('a');
-		lnk.download=fileName;
-		lnk.href=url;
-		lnk.innerText=fileName;
-		lnk.onclick=function(e) {
-			clearGpxDiv();
-		};		
-		gpxDiv.appendChild(lnk);
-		edStatus.value="GPX export ready.";
 	}
 
 	if (autoStart)
