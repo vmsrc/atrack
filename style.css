@@ -1,0 +1,21 @@
+@media (prefers-color-scheme: dark) {
+	body {
+		background-color: #000000;
+		color: #f0fff0;
+	}
+	a:link {
+		color: #00a0ff;
+	}
+	a:visited {
+		color: #80a0ff;
+	}
+	a:hover {
+		background-color:#202020;
+	}
+	a:active {
+		color: #ff8080;
+	}
+}
+img {
+	padding:1px;
+}
